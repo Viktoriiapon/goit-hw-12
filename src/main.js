@@ -2,73 +2,73 @@ import iziToast from 'izitoast';
 import 'izitoast/dist/css/iziToast.min.css';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
-
+import axios from 'axios';
 
 const refs = {
   formEl: document.querySelector('.js-search-form'),
   infoEl: document.querySelector('.js-list-img'),
   loaderEl: document.querySelector('.loader'),
+  loadMoreBtnEl: document.querySelector('.btn-load'),
 };
 
+let page = 1;
+let userQuery = '';
+
 refs.formEl.addEventListener('submit', onFormSubmit);
+refs.loadMoreBtnEl.addEventListener('click', onLoadMore);
 
-function onFormSubmit(e) {
+async function onFormSubmit(e) {
   e.preventDefault();
-  
-
+  page = 1;
+  userQuery = e.target.elements.query.value.trim();
   refs.infoEl.innerHTML = '';
-  
-  
-  refs.loaderEl.classList.add('show');
-
-  const userQuery = e.target.elements.query.value;
-  if (!userQuery) {
-    iziToast.warning({
+  refs.loadMoreBtnEl.style.display = 'none';
+  refs.loaderEl.style.display = 'block';
+  try {
+    const data = await getImage(userQuery, page);
+    renderGallery(data);
+    refs.loadMoreBtnEl.style.display = 'block';
+  } catch (error) {
+    iziToast.error({
       position: 'topRight',
-      message: 'Please enter a search query.',
+      messageSize: '30',
+      message: 'Failed to fetch images. Please try again later.',
     });
-    
-    
-    refs.loaderEl.classList.remove('show');
-    return;
+  } finally {
+    refs.loaderEl.style.display = 'none';
   }
-
-  getImage(userQuery)
-    .then(data => {
-    
-      refs.loaderEl.classList.remove('show');
-
-      if (data.hits.length === 0) {
-        iziToast.error({
-          position: 'topRight',
-          messageSize: '50',
-          message: 'Sorry, there are no images matching your search query. Please try again!',
-        });
-      } else {
-        renderGallery(data);
-        e.target.elements.query.value = '';
-      }
-    })
-    .catch(error => {
-      console.error('Error fetching images:', error);
-      iziToast.error({
-        position: 'topRight',
-        messageSize: '50',
-        message: 'Failed to fetch images. Please try again later.',
-      });
-      
-      refs.loaderEl.classList.remove('show');
-    });
 }
 
-function getImage(nameImage) {
-  const BASE_URL = 'https://pixabay.com/';
-  const END_POINT = '/api/';
-  const PARAMS = `?key=42187150-1e170edc08d41224404163b7f&q=${nameImage}&image_type=photo&orientation=horizontal&safesearch=true`;
+async function onLoadMore() {
+  page += 1;
+  refs.loaderEl.style.display = 'block';
+  try {
+    const data = await getImage(userQuery, page);
+    appendImages(data);
+  } catch (error) {
+    iziToast.error({
+      position: 'topRight',
+      messageSize: '30',
+      message: 'Failed to fetch more images. Please try again later.',
+    });
+  } finally {
+    refs.loaderEl.style.display = 'none';
+  }
+}
 
-  const url = BASE_URL + END_POINT + PARAMS;
-
-  return fetch(url).then(res => res.json());
+async function getImage(nameImage, page) {
+  const params = {
+    key: '42187150-1e170edc08d41224404163b7f',
+    q: nameImage,
+    image_type: 'photo',
+    orientation: 'horizontal',
+    safesearch: true,
+    per_page: 15,
+    page: page,
+  };
+  const url = `https://pixabay.com/api/?`;
+  const response = await axios.get(url, { params });
+  return response.data;
 }
 
 function imageTemplate(nameImage) {
@@ -116,12 +116,15 @@ function imageTemplate(nameImage) {
 
 function renderGallery({ hits }) {
   const markup = hits.map(imageTemplate).join('');
-  refs.infoEl.insertAdjacentHTML('beforeend', markup);
-  
- 
+  refs.infoEl.innerHTML = markup;
   const lightbox = new SimpleLightbox('.gallery-link', {
     captionDelay: 250,
     captionsData: 'alt',
   });
   lightbox.refresh();
+}
+
+function appendImages({ hits }) {
+  const markup = hits.map(imageTemplate).join('');
+  refs.infoEl.insertAdjacentHTML('beforeend', markup);
 }
