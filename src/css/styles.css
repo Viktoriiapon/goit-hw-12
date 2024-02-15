@@ -131,6 +131,10 @@ ul{
     cursor: pointer;
   }
 
+  .hidden{
+    display: none;
+    opacity: 0;
+  }
 
 
   
